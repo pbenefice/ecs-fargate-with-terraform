@@ -1,0 +1,3 @@
+bucket         = "tf-backend-revolve-pbenefice"
+key            = "ecs-with-terraform/prequisites-prd"
+dynamodb_table = "tf-lock-revolve-pbenefice"
