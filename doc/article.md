@@ -128,3 +128,71 @@ resource "aws_security_group" "myapp" {
 
 We now have a first container running on aws :  
 ![cluster-1st-container-running](./img/cluster-1st-container-running.png)  
+
+## ECS Exec
+
+[ECS Exec](https://docs.aws.amazon.com/en_en/AmazonECS/latest/userguide/ecs-exec.html) est une feature qui permet d'interagir et notamment se connecter dans les containers directement via la cli aws.  
+En s'appuyant sur les prerequis détaillés dans le lien précédent, modifions le rôle iam pour y ajouter une policy inline et la définiton de notre task pour activer la feature :
+
+```
+resource "aws_iam_role" "ecs_task_role_myapp" {
+  name = "${local.prefix}-ecs-task-role-${local.app_name}"
+
+  ...
+
+  inline_policy {
+    name = "requirements-for-ecs-exec"
+
+    policy = jsonencode({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          "Effect": "Allow",
+          "Action": [
+            "ssmmessages:CreateControlChannel",
+            "ssmmessages:CreateDataChannel",
+            "ssmmessages:OpenControlChannel",
+            "ssmmessages:OpenDataChannel"
+          ],
+          "Resource": "*"
+        }
+      ]
+    })
+  }
+
+}
+
+resource "aws_ecs_task_definition" "myapp" {
+  task_role_arn = aws_iam_role.ecs_task_role_myapp.arn
+
+  ...
+
+  container_definitions = jsonencode([
+    {
+      image = "debian:buster-20230411-slim"
+
+      ...
+
+      linuxParameters = {
+        "initProcessEnabled"= true
+      }
+    }
+  ])
+}
+```
+
+Nous pouvons dés lors utiliser la cli aws pour se connecter directement dans le container Debian. Il suffit de récupérer via la console le nom du cluster ECS, l'id de la task et le nom du container pour forger une commande similaire à :  
+
+```shell
+aws ecs execute-command --cluster ecsWithTf-dev \
+    --task 32f4aaa9555f4a188789226094c70485 \
+    --container myapp \
+    --interactive \
+    --command "/bin/sh"
+```
+
+Nous avons un pied directement dans le cluster :  
+```
+# uname -a
+Linux ip-10-0-3-184.eu-west-1.compute.internal 5.10.177-158.645.amzn2.x86_64 #1 SMP Thu Apr 6 16:53:11 UTC 2023 x86_64 GNU/Linux
+```

@@ -14,6 +14,10 @@ resource "aws_ecs_task_definition" "myapp" {
       cpu     = 1024
       memory  = 2048
       command = [ "sleep", "3600" ]
+
+      linuxParameters = {
+        "initProcessEnabled"= true
+      }
     }
   ])
 
