@@ -1,4 +1,4 @@
-.PHONY: help tf-echo-backend tf-init-% tf-plan-% tf-apply-% tf-auto-approve-apply-% tf-destroy-%
+.PHONY: help tf-echo-backend tf-init-% tf-plan-% tf-apply-% tf-auto-approve-apply-% tf-destroy-% ssm-bastion ssm-expose-port
 default: help
 
 help: ## Display this text.
@@ -48,3 +48,13 @@ ssm-bastion: ## Display the ssm command to connect to remote bastion ec2
 	$(call message,"""To connect to bastion""")
 	$(call message,"""  - Configure aws profile and run the following ssm command :""")
 	@echo """aws ssm start-session --target ${BASTION_ID}"""
+
+ssm-expose-port: ## Display the ssm command to expose nginx endpoint locally
+	$(eval BASTION_ID := $(shell terraform output --json | jq -r '.bastion_id.value'))
+	$(eval LB_DNS_NAME := $(shell terraform output --json | jq '.module_ecs.value.lb_dns_name'))
+
+	$(call message,"""To expose LOGSTASH locally""")
+	$(call message,"""  - Configure aws profile and run the following ssm command :""")
+	@echo """aws ssm start-session --target ${BASTION_ID} --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters '{\"host\":[\"${LB_DNS_NAME}\"],\"portNumber\":[\"80\"], \"localPortNumber\":[\"8080\"]}'"""
+	$(call message,"""  - Then open the following URL with your browser :""")
+	@echo """http://localhost:8080"""

@@ -11,15 +11,14 @@ resource "aws_ecs_task_definition" "myapp" {
   container_definitions = jsonencode([
     {
       name    = local.app_name
-      image   = "debian:buster-20230411-slim"
+      image   = "nginx:1.24.0"
       cpu     = 1024
       memory  = 2048
-      command = [
-        "sh",
-        "-c",
-        "echo 'Hello World!' && sleep 3600"
-      ]
-
+      # command = [
+      #   "sh",
+      #   "-c",
+      #   "echo 'Hello World!' && sleep 3600"
+      # ]
 
       linuxParameters = {
         "initProcessEnabled"= true
@@ -33,6 +32,14 @@ resource "aws_ecs_task_definition" "myapp" {
               "awslogs-stream-prefix" = "myapp"
           }
       },
+
+      portMappings = [
+        {
+          containerPort = 80
+          hostPort      = 80
+          protocol      = "tcp"
+        }
+      ],
 
     }
   ])
@@ -58,4 +65,12 @@ resource "aws_ecs_service" "myapp" {
     security_groups  = [aws_security_group.myapp.id]
     assign_public_ip = false
   }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.myapp.arn
+    container_name   = local.app_name
+    container_port   = 80
+  }
+
+  depends_on = [aws_lb_listener.myapp]
 }

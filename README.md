@@ -12,6 +12,7 @@ ECS documentation :
 Docker images :  
 [Dockerhub - debian](https://hub.docker.com/_/debian)  
 [Dockerhub - alexeiled/stress-ng](https://hub.docker.com/r/alexeiled/stress-ng/)  
+[Dockerhub - nginx](https://hub.docker.com/_/nginx)  
 
 ## WIP
 
@@ -34,7 +35,7 @@ aws ecs execute-command --cluster <cluster_name> \
 
 ```
 aws ecs execute-command --cluster ecsWithTf-dev \
-    --task 6fb432e851844f9f86c25808e2d41a60 \
+    --task 751aef2a886b450aa7b66d98b88118ab \
     --container myapp \
     --interactive \
     --command "/bin/sh"

@@ -22,5 +22,6 @@ module "ecs" {
   project_prefix  = local.prefix
   env             = var.env
   vpc_id          = data.aws_vpc.selected.id
+  vpc_cidr        = data.aws_vpc.selected.cidr_block
   private_subnets = data.aws_subnets.private_selected.ids
 }

@@ -12,6 +12,10 @@ variable "vpc_id" {
   type        = string
   description = "The id of the VPC to use"
 }
+variable "vpc_cidr" {
+  type        = string
+  description = "The cidr of the VPC used"
+}
 variable "private_subnets" {
   type        = list(string)
   description = "The list of ids of the private_subnets to use"

@@ -200,7 +200,7 @@ Linux ip-10-0-3-184.eu-west-1.compute.internal 5.10.177-158.645.amzn2.x86_64 #1 
 ## Log Driver
 
 Attelons nous à la possibilité pour nos containers d'écrire leur log dans cloudwatch.  
-Il nous faut créer un log group et second rôle IAM. Le premier servant à donner des droits a notre application : le **task_role**.  Le second, le **execution_role**, permettant de donner des droits à l'agent ECS et au daemon docker afin qu'ils puissent écrire dans cloudwatch :  
+Il nous faut créer un log group et un second rôle IAM. Le premier servant à donner des droits a notre application : le **task_role**.  Le second, le **execution_role**, permettant de donner des droits à l'agent ECS et au daemon docker afin qu'ils puissent écrire dans cloudwatch :  
 
 ```
 resource "aws_cloudwatch_log_group" "myapp" {
@@ -283,5 +283,129 @@ resource "aws_ecs_task_definition" "myapp" {
 }
 ```
 
-Une fois que le container a fini de redémarrer nous pouvons ouvrir cloudwatch est constater l'apparition d'un logstream contenant le *Hello World!* généré par notre commande.  
+Une fois que le container a fini de redémarrer nous pouvons ouvrir cloudwatch et constater l'apparition d'un logstream contenant le *Hello World!* généré par notre commande.  
 ![log-driver-hello-world](./img/log-driver-hello-world.png)  
+
+> Pensez à logguer en json si possible. C'est nativement supporté et formaté par Cloudwatch et ça vous simpliefiera la vie plus tard :wink:
+
+## Exposition via load balancer
+
+Pour cette partie changeons d'image docker pour déployer un serveur Nginx et tester l'exposition d'un container via un load balancer. Il nous faut :
+- créer le load balancer, un listener et un target group
+- modifier la configuration de la task et du service ecs pour ouvrir un port et le mapper avec le target group
+- modifier le Security Group pour autoriser le traffic
+
+Rajoutons donc le code terraform suivant :
+
+```shell
+resource "aws_ecs_task_definition" "myapp" {
+  ...
+
+  container_definitions = jsonencode([
+    {
+      name  = local.app_name
+      image = "nginx:1.24.0"
+      # command = [ "sh", "-c", "echo 'Hello World!' && sleep 3600"]
+
+      portMappings = [
+        {
+          containerPort = 80
+          hostPort      = 80
+          protocol      = "tcp"
+        }
+      ],
+
+      ...
+    }
+  ])
+}
+
+resource "aws_ecs_service" "myapp" {
+  name = "${local.prefix}-${local.app_name}"
+  ...
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.myapp.arn
+    container_name   = local.app_name
+    container_port   = 80
+  }
+
+  depends_on = [aws_lb_listener.myapp]
+}
+
+resource "aws_security_group" "myapp" {
+  name = "${local.prefix}-ecs-${local.app_name}"
+  ...
+
+  ingress {
+    description = "myapp ingress"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+}
+
+resource "aws_lb" "this" {
+  name = local.prefix
+
+  internal           = true
+  load_balancer_type = "network"
+  subnets            = var.private_subnets
+
+  enable_deletion_protection = var.env == "prd" ? true : false
+}
+
+resource "aws_lb_target_group" "myapp" {
+  name = "${local.prefix}-ecs${local.app_name}-80"
+
+  port        = 80
+  protocol    = "TCP"
+  target_type = "ip"
+  vpc_id      = var.vpc_id
+
+  health_check {
+    healthy_threshold   = "3"
+    interval            = "300"
+    protocol            = "HTTP"
+    matcher             = "200"
+    timeout             = "3"
+    path                = "/"
+    unhealthy_threshold = "2"
+  }
+}
+
+resource "aws_lb_listener" "myapp" {
+  load_balancer_arn = aws_lb.this.arn
+  port              = 80
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.myapp.arn
+  }
+}
+```
+
+Nous pouvons désormais accéder directement au site exposé par le pod.  
+Si le load balancer est exposé sur internet il suffit de récupérer le DNS Name de ce dernier et d'y accéder en http : `http://<dns_du_load_balancer>`.  
+Dans notre cas le load balancer est interne et n'est accessible que depuis l'intérieur du VPC. Pour exposer le service localement nous pouvons utiliser ssm et le bastion précédemment mis en place.
+
+A l'aide du nom dns du LB et de l'ID de l'instance EC2 servant de bastion, forgeons la commande suivante : 
+
+```
+aws ssm start-session --target <BASTION_ID> \
+  --document-name AWS-StartPortForwardingSessionToRemoteHost \
+  --parameters '{"host":["<LB_DNS_NAME>"],"portNumber":["80"], "localPortNumber":["8080"]}'
+```
+
+Dans notre exemple :  
+
+```
+aws ssm start-session --target i-0a521629659d7a339 \
+  --document-name AWS-StartPortForwardingSessionToRemoteHost \
+  --parameters '{"host":["ecsWithTf-dev-6b5b9d0f19671471.elb.eu-west-1.amazonaws.com"],"portNumber":["80"], "localPortNumber":["8080"]}'
+```
+
+Le port 80 que nous avons ouvert sur le container Nginx est alors exposé localement sur le port 8080 de notre PC. Il suffit d'ouvrir un navigateur et de visiter `http://localhost:8080/` :  
+![welcome-to-nginx](./img/welcome-to-nginx.png)  
