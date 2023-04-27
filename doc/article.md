@@ -196,3 +196,92 @@ Nous avons un pied directement dans le cluster :
 # uname -a
 Linux ip-10-0-3-184.eu-west-1.compute.internal 5.10.177-158.645.amzn2.x86_64 #1 SMP Thu Apr 6 16:53:11 UTC 2023 x86_64 GNU/Linux
 ```
+
+## Log Driver
+
+Attelons nous à la possibilité pour nos containers d'écrire leur log dans cloudwatch.  
+Il nous faut créer un log group et second rôle IAM. Le premier servant à donner des droits a notre application : le **task_role**.  Le second, le **execution_role**, permettant de donner des droits à l'agent ECS et au daemon docker afin qu'ils puissent écrire dans cloudwatch :  
+
+```
+resource "aws_cloudwatch_log_group" "myapp" {
+  name = "${local.name_prefix}-ecs-${local.app_name}"
+
+  retention_in_days = 90
+}
+
+# role that allows your Amazon ECS container task to make calls to other AWS services.
+resource "aws_iam_role" "ecs_task_role_myapp" {
+  name = "${local.prefix}-ecs-task-role-${local.app_name}"
+
+  ...
+}
+
+# role that the Amazon ECS container agent and the Docker daemon can assume (required for using awslogs log driver).
+resource "aws_iam_role" "ecs_execution_role_myapp" {
+  name = "${local.name_prefix}-ecs-execution-role-${local.app_name}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Sid    = ""
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  inline_policy {
+    name = "requirements-for-log-driver"
+
+    policy = jsonencode({
+      Version : "2012-10-17",
+      Statement : [
+        {
+          "Effect" : "Allow",
+          "Action" : [
+            "logs:CreateLogStream",
+            "logs:PutLogEvents"
+          ],
+          "Resource" : "*"
+        }
+      ]
+    })
+  }
+}
+
+resource "aws_ecs_task_definition" "myapp" {
+
+  task_role_arn      = aws_iam_role.ecs_task_role_myapp.arn
+  execution_role_arn = aws_iam_role.ecs_execution_role_myapp.arn
+
+  container_definitions = jsonencode([
+    {
+      command = [
+        "sh",
+        "-c",
+        "echo 'Hello World!' && sleep 3600"
+      ]
+
+      logConfiguration = {
+          "logDriver" = "awslogs",
+          "options" = {
+              "awslogs-group" = aws_cloudwatch_log_group.myapp.name,
+              "awslogs-region" = local.region,
+              "awslogs-stream-prefix" = "myapp"
+          }
+      },
+
+      ...
+    }
+  ])
+
+  ...
+}
+```
+
+Une fois que le container a fini de redémarrer nous pouvons ouvrir cloudwatch est constater l'apparition d'un logstream contenant le *Hello World!* généré par notre commande.  
+![log-driver-hello-world](./img/log-driver-hello-world.png)  

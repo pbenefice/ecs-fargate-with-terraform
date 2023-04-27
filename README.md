@@ -34,7 +34,7 @@ aws ecs execute-command --cluster <cluster_name> \
 
 ```
 aws ecs execute-command --cluster ecsWithTf-dev \
-    --task 32f4aaa9555f4a188789226094c70485 \
+    --task 6fb432e851844f9f86c25808e2d41a60 \
     --container myapp \
     --interactive \
     --command "/bin/sh"

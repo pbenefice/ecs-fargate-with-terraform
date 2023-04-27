@@ -5,7 +5,8 @@ resource "aws_ecs_task_definition" "myapp" {
   cpu                      = 1024
   memory                   = 2048
 
-  task_role_arn = aws_iam_role.ecs_task_role_myapp.arn
+  task_role_arn      = aws_iam_role.ecs_task_role_myapp.arn
+  execution_role_arn = aws_iam_role.ecs_execution_role_myapp.arn
 
   container_definitions = jsonencode([
     {
@@ -13,11 +14,26 @@ resource "aws_ecs_task_definition" "myapp" {
       image   = "debian:buster-20230411-slim"
       cpu     = 1024
       memory  = 2048
-      command = [ "sleep", "3600" ]
+      command = [
+        "sh",
+        "-c",
+        "echo 'Hello World!' && sleep 3600"
+      ]
+
 
       linuxParameters = {
         "initProcessEnabled"= true
       }
+
+      logConfiguration = {
+          "logDriver" = "awslogs",
+          "options" = {
+              "awslogs-group" = aws_cloudwatch_log_group.myapp.name,
+              "awslogs-region" = local.region,
+              "awslogs-stream-prefix" = "myapp"
+          }
+      },
+
     }
   ])
 
