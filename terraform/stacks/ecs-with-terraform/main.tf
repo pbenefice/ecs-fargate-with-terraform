@@ -15,3 +15,12 @@ module "bastion" {
   subnet_id     = data.aws_subnets.private_selected.ids[0]
   allowed_cidrs = [data.aws_vpc.selected.cidr_block]
 }
+
+module "ecs" {
+  source = "../../modules/ecs"
+
+  project_prefix  = local.prefix
+  env             = var.env
+  vpc_id          = data.aws_vpc.selected.id
+  private_subnets = data.aws_subnets.private_selected.ids
+}
