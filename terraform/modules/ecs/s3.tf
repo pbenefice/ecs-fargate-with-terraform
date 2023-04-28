@@ -1,5 +1,9 @@
 locals {
   myapp_config_fileset = fileset("${path.module}/artifacts", "{conf.d,html}/*")
+  myapp_config_hash = sha256(join("-", [
+    for file in local.myapp_config_fileset :
+    filesha256("${path.module}/artifacts/${file}")
+  ]))
 }
 
 resource "aws_s3_bucket_object" "myapp_config" {
@@ -8,6 +12,7 @@ resource "aws_s3_bucket_object" "myapp_config" {
   bucket = aws_s3_bucket.ecs_artifacts.id
   key    = "${local.app_name}/${each.value}"
   source = "${path.module}/artifacts/${each.value}"
+  etag   = filemd5("${path.module}/artifacts/${each.value}")
 }
 
 resource "aws_s3_bucket" "ecs_artifacts" {

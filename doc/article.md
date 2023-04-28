@@ -560,3 +560,58 @@ L'exemple ici ne montre pas la configuration des logs pour l'init conteneur, mai
 
 Et en affichant la page par défaut de Nginx, la version modifiée par nos soins s'affiche :  
 ![customized-nginx-default-page](./img/customized-nginx-default-page.png)
+
+## Redémarrage sur changement de config
+
+I reste un point à traiter avec le setup via s3 que nous venons de mettre en place. En effet si nous modifions la configuration de notre appli dans le code terraform : rien ne passe. Or nous voudrions que ces changements soit détectés et provoque le redémarrage de l'appli pour que l'init-container re-synchronise la config avec les derniers changement et que l'appli redémarre.
+
+Deux chose a faire pour cela :
+- modifier l'upload de nos fichiers sur s3 pour suivre les changements sur les fichier locaux, via l'option `etag` de la resource *bucket_object*
+- forger notre propre hash de l'ensemble des fichiers de config et définir cette valeur comme variable d'environnement dans notre appli. Dés lors tout changement de cette valeur (et donc de la config) provoquera un re-démarrage.
+
+Comme d'habitude, les évolutions du code terraform :  
+```shell
+locals {
+  # récupération des fichier a synchroniser (comme précédemment)
+  myapp_config_fileset = fileset("${path.module}/artifacts", "{conf.d,html}/*")
+
+  # hash de tous les fichier, puis hash de la concaténation des hash des fichier :
+  # créé une valeur unique qui change à chaque changement de config
+  myapp_config_hash = sha256(join("-", [
+    for file in local.myapp_config_fileset :
+    filesha256("${path.module}/artifacts/${file}")
+  ]))
+}
+
+# ajout du "etag" pour tracker les changements des fichiers sources
+resource "aws_s3_bucket_object" "myapp_config" {
+  for_each = local.myapp_config_fileset
+  
+  ...
+  etag = filemd5("${path.module}/artifacts/${each.value}")
+}
+
+# Ajout d'une variable d'environnement dans le container principal
+# provoque un changement et donc un redémarrage à chaque modification des fichiers de config
+resource "aws_ecs_task_definition" "myapp" {
+  ...
+
+  container_definitions = jsonencode([
+    {
+      name    = local.app_name
+      image   = "nginx:1.24.0"
+      ...
+
+      environment : [
+        { "name" : "CONFIG_HASH", "value" : local.myapp_config_hash }
+      ],
+    },
+  ])
+
+}
+```
+
+Désormais en changeant l'un des fichiers de configuration, terraform détectera le changement et provoquera le demérrage de l'appli (et donc une re-synchro via s3) :  
+![restart-on-config-change](./img/restart-on-config-change.png)
+
+De mon coté j'ai modifié l'index.html, et aprés un petit temps de patience (quelques minutes) : la page par défaut se met à jour automatiquement.

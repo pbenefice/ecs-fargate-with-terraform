@@ -44,6 +44,10 @@ resource "aws_ecs_task_definition" "myapp" {
           }
       },
 
+      environment : [
+        { "name" : "CONFIG_HASH", "value" : local.myapp_config_hash }, # trigger restart if config is modified
+      ],
+
       portMappings = [
         {
           containerPort = 80
@@ -62,6 +66,7 @@ resource "aws_ecs_task_definition" "myapp" {
           "sourceVolume"  = "source"
         }
       ],
+      volumesFrom = []
 
       dependsOn : [{
         "ContainerName" = "${local.app_name}-init-container",
@@ -105,6 +110,10 @@ resource "aws_ecs_task_definition" "myapp" {
           "awslogs-stream-prefix" = local.app_name
         }
       },
+      environment  = []
+      portMappings = []
+      volumesFrom  = []
+
       essential = false
 
     }
