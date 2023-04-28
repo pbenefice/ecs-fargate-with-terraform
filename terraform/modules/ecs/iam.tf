@@ -17,6 +17,23 @@ resource "aws_iam_role" "ecs_task_role_myapp" {
   })
 
   inline_policy {
+    name = "app-access"
+
+    policy = jsonencode({
+      Version : "2012-10-17",
+      Statement : [
+        {
+          "Effect" : "Allow",
+          "Action" : [
+            "s3:*"
+          ],
+          "Resource" : "*"
+        }
+      ]
+    })
+  }
+
+  inline_policy {
     name = "requirements-for-ecs-exec"
 
     policy = jsonencode({

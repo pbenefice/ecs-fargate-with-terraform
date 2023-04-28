@@ -409,3 +409,154 @@ aws ssm start-session --target i-0a521629659d7a339 \
 
 Le port 80 que nous avons ouvert sur le container Nginx est alors exposé localement sur le port 8080 de notre PC. Il suffit d'ouvrir un navigateur et de visiter `http://localhost:8080/` :  
 ![welcome-to-nginx](./img/welcome-to-nginx.png)  
+
+## Init container, volume et fichier de config
+
+Nous souhaitons maintenant avoir la main sur la config et la page par défaut de Nginx afin de pouvoir personnaliser l'ensemble. Pour cela nous devons controller le contenu des dossier `/etc/nginx/conf.d/` & `/usr/share/nginx/html/` dans le container.  
+Pour ce faire nous allons :
+- mettre a jour le rôle iam utilisé par nos container pour autoriser l'accés au service s3
+- gérer dans le code terraform les fichiers (et leur contenus) que nous souhaitons placer dans lesdits dossiers
+- uploader ces fichiers dans un bucket s3 toujours via terraform
+- utiliser un container temporaire qui se lancera avant chaque démarrage du container Nginx seulement le temps de récupérer lesdits fichiers
+- Des volume partagés entre le container nginx et le container temporaire pour que ce dernier puisse y coller les fichiers
+- ces volumes partagés auront pour point de montage dans l'image Nginx les locations par défaut ou doivent se trouver les fichiers de configuration 
+
+Au final quand le container Nginx demarrera, nos dossiers définis dans terraform auront remplacé ceux existant dans l'image docker (remplacé par nos montage), et nginx s'initialisera avec la configuration que nous maitrisons.  
+
+> Attention, les montage réseau "supprime" l'ensemble des fichiers contenu dans le dossier sur lequel ils sont monté. Il faut donc gérer l'ensemble des fichiers qui doivent exister dans le dossier concerné par le point de montage, pas seulement ceux que nous souhaitons modifier.
+
+Créons les fichiers de config localement, dans notre dossier terraform ajoutons un dossier artifacts :  
+```shell
+./artifacts
+├── conf.d
+│   └── default.conf
+└── html
+    ├── 50x.html
+    └── index.html
+```
+
+Puis modifions de nouveau le code terraform :  
+```shell
+resource "aws_ecs_task_definition" "myapp" {
+  ...
+
+  # add the volumes relying on the default ephemeral storage provided by Fargate (20G by default)
+  # two volumes because we want to manage two folders : /etc/nginx/conf.d & /usr/share/nginx/html
+  volume {
+    name = "config"
+  }
+  volume {
+    name = "source"
+  }
+
+  container_definitions = jsonencode([
+    {
+      name = local.app_name
+      ...
+
+      # adding mountpoint (populated by the init container below) to the proper paths within the main container
+      mountPoints = [
+        {
+          "containerPath" = "/etc/nginx/conf.d",
+          "sourceVolume"  = "config"
+        },
+        {
+          "containerPath" = "/usr/share/nginx/html",
+          "sourceVolume"  = "source"
+        }
+      ],
+
+      # explicit dependency ; we need the init container to complete before starting the main one
+      dependsOn : [{
+        "ContainerName" = "${local.app_name}-init-container",
+        "Condition"     = "COMPLETE"
+      }],
+
+      # specify this is the main container
+      essential = true
+
+    },
+    {
+      # creating a secondary container that will copy files then stop (only partial config here, think about logs and so on)
+      name    = "${local.app_name}-init-container"
+      image   = "amazon/aws-cli:2.11.13"
+      command = ["s3", "cp", "s3://${aws_s3_bucket.ecs_artifacts.id}/${local.app_name}/", "${local.init_container_sync_path}/", "--recursive", "--include", "'conf.d/*'", "--include", "'html/*'"]
+      ...
+
+      # mountpoint to populate the volumes with the files gathered from s3 via the "command" given to the container
+      mountPoints = [
+        {
+          "containerPath" = "${local.init_container_sync_path}/conf.d",
+          "sourceVolume"  = "config"
+        },
+        {
+          "containerPath" = "${local.init_container_sync_path}/html",
+          "sourceVolume"  = "source"
+        }
+      ],
+
+      # Specify this container is temporary
+      essential = false
+
+    }
+  ])
+
+  ...
+}
+
+resource "aws_iam_role" "ecs_task_role_myapp" {
+  name = "${local.prefix}-ecs-task-role-${local.app_name}"
+  ...
+
+  # Add an inline policy to grant access to s3 within containers
+  inline_policy {
+    name = "app-access"
+
+    policy = jsonencode({
+      Version : "2012-10-17",
+      Statement : [
+        {
+          "Effect" : "Allow",
+          "Action" : [
+            "s3:*"
+          ],
+          "Resource" : "*"
+        }
+      ]
+    })
+  }
+
+  inline_policy {
+    name = "requirements-for-ecs-exec"
+    ...
+  }
+}
+
+resource "aws_s3_bucket" "ecs_artifacts" {
+  bucket = lower("${local.prefix}-cdp-ecs-artifacts")
+}
+
+# define the files we want to sync
+# in our case we created an artifacts folder in the module containing the two folders we want to sync : 'conf.d' & 'html'
+locals {
+  myapp_config_fileset = fileset("${path.module}/artifacts", "{conf.d,html}/*")
+}
+
+# pushing previously selected files to s3
+# each file under artifcats/<file> is pused to <app_name>/<file>
+# this relates to the s3 command in the init container
+resource "aws_s3_bucket_object" "myapp_config" {
+  for_each = local.myapp_config_fileset
+
+  bucket = aws_s3_bucket.ecs_artifacts.id
+  key    = "${local.app_name}/${each.value}"
+  source = "${path.module}/artifacts/${each.value}"
+  etag   = filemd5("${path.module}/artifacts/${each.value}")
+}
+```
+
+L'exemple ici ne montre pas la configuration des logs pour l'init conteneur, mais en copiant collant le même bloc de configuration que pour le conteneur principal on voit la copie s3 dans cloudwatch :  
+![init-container-s3-copy-logs](./img/init-container-s3-copy-logs.png)  
+
+Et en affichant la page par défaut de Nginx, la version modifiée par nos soins s'affiche :  
+![customized-nginx-default-page](./img/customized-nginx-default-page.png)
