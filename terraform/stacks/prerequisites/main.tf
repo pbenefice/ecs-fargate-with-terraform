@@ -7,7 +7,8 @@ module "naming" {
 }
 
 module "vpc" {
-  source = "terraform-aws-modules/vpc/aws"
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "4.0.2"
 
   name = "ecsWithTf-${var.env}"
   cidr = "10.0.0.0/16"

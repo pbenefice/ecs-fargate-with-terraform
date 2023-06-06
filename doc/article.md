@@ -1,9 +1,27 @@
 # ECS with terraform
 
-## Prerequis
+J'ai récemment eu le besoin de déployer une application sans avoir accès à une réelle infra sous jacente, l'environnement étant principalement serverless.  
+L'option ECS Fargate s'est donc assez rapidement présentée et je trace ici mes premiers "vrai" pas avec la solution.  
 
-Nous considérerons ici que certains éléments existent déjà dans le compte AWS ou nous ferons nos tests. Notamment un VPC configuré avec des réseaux privé ayant un accès a internet via une NAT Gateway.  
-Le repository de démonstration contient du code permettant de mettre en place ces prerequis si necessaire.  
+Cet article couvre pour l'instant :  
+- démarrer un conteneur et un serivce dans un cluster ECS
+- intéragir avec les conteneurs via ssm et 'ecs exec'
+- configurer et logguer dans cloudwatch
+- exposer un service via un load balancer
+- uploader des fichiers de configuration via s3/init-conteneur
+- gérer le rédémarrage automatique sur changement de configuration
+
+L'intégralité du code peut être trouvé sur github : [pbenefice/ecs-with-terraform](https://github.com/pbenefice/ecs-with-terraform/tree/main/terraform/modules/ecs)  
+
+**Contexte** : Il s'agissait de tester une application tierce. Je n'avais pas donc pas la main sur le code.  
+J'ai également souhaité éviter toutes les solutions impliquant de builder ma propre image docker. Partisant du moindre effort : les images existant déjà j'ai préféré une solution capitalisant sur des ressources gérées par d'autres.  
+Le choix s'es porté sur ECS Fargate principalement sur l'intuition d'une relative simplicité et de la possibilité de piloter l'ensemble via terraform qui était déjà en place.  
+
+**Disclaimer** : il ne s'agit pas de la vérité, ou d'un état de l'art, mais de la documentation d'une 1ère approche, dans un contexte spécifique. Cela sera surement amenée à évoluer la prochaine fois que je serais confronté à l'outil ou en fonction des retours que j'aurais.  
+N'hésitez surtout pas si vous avez des retours critiques, ils sont bienvenus!  
+
+**Prerequis** : Je considére ici que certains éléments existent déjà dans le compte AWS ou nous ferons nos tests. Notamment un VPC configuré avec des réseaux privé ayant un accès a internet via une NAT Gateway. Le repository de démonstration contient du code permettant de mettre en place ces prerequis si nécessaire.  
+> Voir [/terraform/stacks/prerequisites sur le dépot github](https://github.com/pbenefice/ecs-with-terraform/tree/main/terraform/stacks/prerequisites)  
 
 ## Cluster et 1er container
 
@@ -15,6 +33,7 @@ Il nous faut donc :
 - un security group
 
 Nous prendrons une image Debian pour faciliter les tests dans un premier temps. Le code ressemble donc à :  
+> Voir également le [commit `feat: cluster & first container` sur le dépot github](https://github.com/pbenefice/ecs-with-terraform/commit/3bada7df9a65e615b12d11bd2abd00b2eb4384e7)  
 
 ```terraform
 locals {
@@ -126,14 +145,14 @@ resource "aws_security_group" "myapp" {
 }
 ```
 
-We now have a first container running on aws :  
+Nous avons un premier conteneur qui tourne sur AWS :  
 ![cluster-1st-container-running](./img/cluster-1st-container-running.png)  
 
 ## ECS Exec
 
 [ECS Exec](https://docs.aws.amazon.com/en_en/AmazonECS/latest/userguide/ecs-exec.html) est une feature qui permet d'interagir et notamment se connecter dans les containers directement via la cli aws.  
-En s'appuyant sur les prerequis détaillés dans le lien précédent, modifions le rôle iam pour y ajouter une policy inline et la définiton de notre task pour activer la feature :
-
+En s'appuyant sur les prerequis détaillés dans le lien précédent, modifions le rôle iam pour y ajouter une policy inline et la définiton de notre task pour activer la feature :  
+> cf [commit 'feat: enable ecs exec'](https://github.com/pbenefice/ecs-with-terraform/commit/6d25844ddbd4827d2bcdb53052fa33c81953cb2f) sur github  
 ```
 resource "aws_iam_role" "ecs_task_role_myapp" {
   name = "${local.prefix}-ecs-task-role-${local.app_name}"
@@ -615,3 +634,38 @@ Désormais en changeant l'un des fichiers de configuration, terraform détectera
 ![restart-on-config-change](./img/restart-on-config-change.png)
 
 De mon coté j'ai modifié l'index.html, et aprés un petit temps de patience (quelques minutes) : la page par défaut se met à jour automatiquement.
+
+## Le code complet
+
+L'intégralité du code peut être trouvé sur github : [pbenefice/ecs-with-terraform - /terraform/modules/ecs](https://github.com/pbenefice/ecs-with-terraform/tree/main/terraform/modules/ecs)  
+Déployé par le biais de la stack terraform : [pbenefice/ecs-with-terraform - /terraform/stacks/ecs-with-terraform](https://github.com/pbenefice/ecs-with-terraform/tree/main/terraform/stacks/ecs-with-terraform)  
+
+Le Makefile dans ce dernier répertoire contient quelques commandes utiles : 
+```
+❯ make
+help                             Display this text.
+tf-echo-backend                  Display currently configured backend key
+ssm-bastion                      Display the ssm command to connect to remote bastion ec2
+ssm-expose-port                  Display the ssm command to expose nginx endpoint locally
+tf-init-<env>                    terraform init for given env
+tf-plan-<env>                    terraform plan for given env (require tf-init-%)
+tf-apply-<env>                   terraform apply for given env (require tf-init-%)
+tf-auto-approve-apply-<env>      terraform apply for given env (require tf-init-%)
+tf-destroy-<env>                 terraform destroy for given env (require tf-init-%)
+```
+
+## Conclusion
+
+A titre personnel j'ai atteint le terme du POC. J'ai quand même appris deux/trois choses au passage donc je trace et j'espère que ça pourra servir à quelqu'un d'autre. (notamment à moi, d'ici deux mois quand j'aurais tout oublié xD)  
+Encore une fois : n'hésitez pas si vous avez des remarques / questions / suggestions.
+
+Pour aller plus loin a mon sens il y aurait par exemple les points suivants :  
+- communication entre service en interne du cluster ?  
+  > [docs.aws.amazon.com - Networking between Amazon ECS services in a VPC](https://docs.aws.amazon.com/AmazonECS/latest/bestpracticesguide/networking-connecting-services.html)  
+  > [Hashicorp Demo App](https://github.com/hashicorp/demo-consul-101/tree/master)  
+- test de montée en charge et autoscaling ?  
+  > [Dockerhub - alexeiled/stress-ng](https://hub.docker.com/r/alexeiled/stress-ng/)  
+
+A plus.
+
+Pierre.

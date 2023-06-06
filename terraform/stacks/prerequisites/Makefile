@@ -15,7 +15,7 @@ tf-echo-backend: ## Display currently configured backend key
 
 tf-init-%: ## terraform init for given env
 	$(eval ENV := $(shell echo $@ | sed 's!^tf-init-\([a-zA-Z]*\)!\1!g'))
-	sudo rm -rf .terraform/
+	sudo rm -rf .terraform/ .terraform.lock.hcl
 	@terraform init -backend-config "config/${ENV}.s3.tfbackend"
 
 tf-plan-%: | tf-echo-backend ## terraform plan for given env (require tf-init-%)

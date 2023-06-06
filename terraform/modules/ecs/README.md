@@ -1,3 +1,3 @@
-# ecs-global
+# ecs
 
-Define common ecs resource like ecs cluster or s3 bucket to store artifacts.  
+Demo to deploy an app on ECS
