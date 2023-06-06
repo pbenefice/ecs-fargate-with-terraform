@@ -11,7 +11,7 @@ Cet article couvre pour l'instant :
 - uploader des fichiers de configuration via s3/init-conteneur
 - gérer le rédémarrage automatique sur changement de configuration
 
-L'intégralité du code peut être trouvé sur github : [pbenefice/ecs-with-terraform](https://github.com/pbenefice/ecs-with-terraform/tree/main/terraform/modules/ecs)  
+L'intégralité du code peut être trouvé sur github : [pbenefice/ecs-fargate-with-terraform](https://github.com/pbenefice/ecs-fargate-with-terraform/tree/main/terraform/modules/ecs)  
 
 **Contexte** : Il s'agissait de tester une application tierce. Je n'avais pas donc pas la main sur le code.  
 J'ai également souhaité éviter toutes les solutions impliquant de builder ma propre image docker. Partisant du moindre effort : les images existant déjà j'ai préféré une solution capitalisant sur des ressources gérées par d'autres.  
@@ -21,7 +21,7 @@ Le choix s'es porté sur ECS Fargate principalement sur l'intuition d'une relati
 N'hésitez surtout pas si vous avez des retours critiques, ils sont bienvenus!  
 
 **Prerequis** : Je considére ici que certains éléments existent déjà dans le compte AWS ou nous ferons nos tests. Notamment un VPC configuré avec des réseaux privé ayant un accès a internet via une NAT Gateway. Le repository de démonstration contient du code permettant de mettre en place ces prerequis si nécessaire.  
-> Voir [/terraform/stacks/prerequisites sur le dépot github](https://github.com/pbenefice/ecs-with-terraform/tree/main/terraform/stacks/prerequisites)  
+> Voir [/terraform/stacks/prerequisites sur le dépot github](https://github.com/pbenefice/ecs-fargate-with-terraform/tree/main/terraform/stacks/prerequisites)  
 
 ## Cluster et 1er container
 
@@ -33,7 +33,7 @@ Il nous faut donc :
 - un security group
 
 Nous prendrons une image Debian pour faciliter les tests dans un premier temps. Le code ressemble donc à :  
-> Voir également le [commit `feat: cluster & first container` sur le dépot github](https://github.com/pbenefice/ecs-with-terraform/commit/3bada7df9a65e615b12d11bd2abd00b2eb4384e7)  
+> Voir également le [commit `feat: cluster & first container` sur le dépot github](https://github.com/pbenefice/ecs-fargate-with-terraform/commit/3bada7df9a65e615b12d11bd2abd00b2eb4384e7)  
 
 ```terraform
 locals {
@@ -152,7 +152,7 @@ Nous avons un premier conteneur qui tourne sur AWS :
 
 [ECS Exec](https://docs.aws.amazon.com/en_en/AmazonECS/latest/userguide/ecs-exec.html) est une feature qui permet d'interagir et notamment se connecter dans les containers directement via la cli aws.  
 En s'appuyant sur les prerequis détaillés dans le lien précédent, modifions le rôle iam pour y ajouter une policy inline et la définiton de notre task pour activer la feature :  
-> cf [commit 'feat: enable ecs exec'](https://github.com/pbenefice/ecs-with-terraform/commit/6d25844ddbd4827d2bcdb53052fa33c81953cb2f) sur github  
+> cf [commit 'feat: enable ecs exec'](https://github.com/pbenefice/ecs-fargate-with-terraform/commit/6d25844ddbd4827d2bcdb53052fa33c81953cb2f) sur github  
 ```
 resource "aws_iam_role" "ecs_task_role_myapp" {
   name = "${local.prefix}-ecs-task-role-${local.app_name}"
@@ -637,8 +637,8 @@ De mon coté j'ai modifié l'index.html, et aprés un petit temps de patience (q
 
 ## Le code complet
 
-L'intégralité du code peut être trouvé sur github : [pbenefice/ecs-with-terraform - /terraform/modules/ecs](https://github.com/pbenefice/ecs-with-terraform/tree/main/terraform/modules/ecs)  
-Déployé par le biais de la stack terraform : [pbenefice/ecs-with-terraform - /terraform/stacks/ecs-with-terraform](https://github.com/pbenefice/ecs-with-terraform/tree/main/terraform/stacks/ecs-with-terraform)  
+L'intégralité du code peut être trouvé sur github : [pbenefice/ecs-fargate-with-terraform - /terraform/modules/ecs](https://github.com/pbenefice/ecs-fargate-with-terraform/tree/main/terraform/modules/ecs)  
+Déployé par le biais de la stack terraform : [pbenefice/ecs-fargate-with-terraform - /terraform/stacks/ecs-fargate-with-terraform](https://github.com/pbenefice/ecs-fargate-with-terraform/tree/main/terraform/stacks/ecs-fargate-with-terraform)  
 
 Le Makefile dans ce dernier répertoire contient quelques commandes utiles : 
 ```

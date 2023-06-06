@@ -9,7 +9,7 @@ module "naming" {
   source = "../../modules/naming"
 
   env      = var.env
-  project  = "ecs-with-terraform"
+  project  = "ecs-fargate-with-terraform"
   tf_stack = "main"
 }
 

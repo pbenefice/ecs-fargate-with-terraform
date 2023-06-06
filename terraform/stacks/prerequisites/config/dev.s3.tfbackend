@@ -1,3 +1,3 @@
 bucket         = "tf-backend-revolve-pbenefice"
-key            = "ecs-with-terraform/prequisites-dev"
+key            = "ecs-fargate-with-terraform/prequisites-dev"
 dynamodb_table = "tf-lock-revolve-pbenefice"

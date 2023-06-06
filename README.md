@@ -1,4 +1,4 @@
-# ecs-with-terraform
+# ecs-fargate-with-terraform
 
 [Blog article](./doc/article.md)  
 

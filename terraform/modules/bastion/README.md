@@ -8,7 +8,7 @@ Create EC2 instances in provided private subnet with access via SSM.
 data "aws_vpc" "selected" {
   filter {
     name   = "tag:project"
-    values = ["ecs-with-terraform"]
+    values = ["ecs-fargate-with-terraform"]
   }
 
   filter {
@@ -20,7 +20,7 @@ data "aws_vpc" "selected" {
 data "aws_subnets" "private_selected" {
   filter {
     name   = "tag:project"
-    values = ["ecs-with-terraform"]
+    values = ["ecs-fargate-with-terraform"]
   }
 
   filter {
