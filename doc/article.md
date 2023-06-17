@@ -1,26 +1,26 @@
-# ECS with terraform
+# ECS with Terraform
 
 J'ai récemment eu le besoin de déployer une application sans avoir accès à une réelle infra sous-jacente, l'environnement étant principalement serverless.  
-L'option ECS Fargate s'est donc assez rapidement présentée et je trace ici mes premiers "vrai" pas avec la solution.  
+L'option ECS Fargate s'est donc assez rapidement présentée et je trace ici mes premiers "vrais" pas avec la solution.  
 
 Cet article couvre pour l'instant :  
 - démarrer un conteneur et un service dans un cluster ECS
-- interagir avec les conteneurs via ssm et 'ecs exec'
-- configurer et logguer dans cloudwatch
+- interagir avec les conteneurs via SSM et 'ecs exec'
+- configurer et logguer dans Cloudwatch
 - exposer un service via un load balancer
 - uploader des fichiers de configuration via s3/init-conteneur
 - gérer le redémarrage automatique sur changement de configuration
 
-L'intégralité du code peut être trouvé sur github : [pbenefice/ecs-fargate-with-terraform](https://github.com/pbenefice/ecs-fargate-with-terraform/tree/main/terraform/modules/ecs)  
+L'intégralité du code peut être trouvé sur Github : [pbenefice/ecs-fargate-with-terraform](https://github.com/pbenefice/ecs-fargate-with-terraform/tree/main/terraform/modules/ecs)  
 
 **Contexte** : Il s'agissait de tester une application tierce. Je n'avais donc pas la main sur le code.  
-J'ai également souhaité éviter toutes les solutions impliquant de builder ma propre image docker. Partisan du moindre effort : les images existant déjà j'ai préféré une solution capitalisant sur des ressources gérées par d'autres.  
-Le choix s'est porté sur ECS Fargate principalement sur l'intuition d'une relative simplicité et de la possibilité de piloter l'ensemble via terraform qui était déjà en place.  
+J'ai également souhaité éviter toutes les solutions impliquant de builder ma propre image docker. Partisan du moindre effort : les images existant déjà, j'ai préféré une solution capitalisant sur des ressources gérées par d'autres.  
+Le choix s'est porté sur ECS Fargate, principalement sur l'intuition d'une relative simplicité et de la possibilité de piloter l'ensemble via Terraform qui était déjà en place.  
 
-**Disclaimer** : il ne s'agit pas de la vérité, ou d'un état de l'art, mais de la documentation d'une première approche, dans un contexte spécifique. Cela sera sûrement amenée à évoluer la prochaine fois que je serais confronté à l'outil ou en fonction des retours que j'aurais.  
-N'hésitez surtout pas si vous avez des retours critiques, ils sont bienvenus!  
+**Disclaimer** : Il ne s'agit pas de la vérité ou d'un état de l'art mais de la documentation d'une première approche dans un contexte spécifique. Cela sera sûrement amené à évoluer la prochaine fois que je serai confronté à l'outil ou en fonction des retours que j'aurai.  
+N'hésitez surtout pas si vous avez des retours critiques, ils sont les bienvenus !  
 
-**Prerequis** : Je considère ici que certains éléments existent déjà dans le compte AWS ou nous ferons nos tests. Notamment un VPC configuré avec des réseaux privés ayant un accès à internet via une NAT Gateway. Le repository de démonstration contient du code permettant de mettre en place ces prérequis si nécessaire.  
+**Prerequis** : Je considère ici que certains éléments existent déjà dans le compte AWS où nous ferons nos tests. Notamment un VPC configuré avec des réseaux privés ayant un accès à internet via une NAT Gateway. Le repository de démonstration contient du code permettant de mettre en place ces prérequis si nécessaire.  
 > Voir [/terraform/stacks/prerequisites sur le dépot github](https://github.com/pbenefice/ecs-fargate-with-terraform/tree/main/terraform/stacks/prerequisites)  
 
 ## Cluster et 1er container
@@ -29,11 +29,11 @@ Commençons par créer le cluster et faire tourner un simple container dessus.
 Il nous faut donc :
 - un cluster et un log group associé,
 - un service et une task definition,
-- un rôle iam (qui permettra à terme de donner des droits au container),
+- un rôle IAM (qui permettra à terme de donner des droits au container),
 - un security group
 
 Nous prendrons une image Debian pour faciliter les tests dans un premier temps. Le code ressemble donc à :  
-> Voir également le [commit `feat: cluster & first container` sur le dépot github](https://github.com/pbenefice/ecs-fargate-with-terraform/commit/3bada7df9a65e615b12d11bd2abd00b2eb4384e7)  
+> Voir également le [commit `feat: cluster & first container` sur le dépôt github](https://github.com/pbenefice/ecs-fargate-with-terraform/commit/3bada7df9a65e615b12d11bd2abd00b2eb4384e7)  
 
 ```terraform
 locals {
@@ -150,8 +150,8 @@ Nous avons un premier conteneur qui tourne sur AWS :
 
 ## ECS Exec
 
-[ECS Exec](https://docs.aws.amazon.com/en_en/AmazonECS/latest/userguide/ecs-exec.html) est une feature qui permet d'interagir et notamment se connecter dans les containers directement via la cli aws.  
-En s'appuyant sur les prérequis détaillés dans le lien précédent, modifions le rôle iam pour y ajouter une policy inline et la définition de notre task pour activer la feature :  
+[ECS Exec](https://docs.aws.amazon.com/en_en/AmazonECS/latest/userguide/ecs-exec.html) est une feature qui permet d'interagir et notamment de se connecter dans les containers directement via la CLI AWS.  
+En nous appuyant sur les prérequis détaillés dans le lien précédent, modifions le rôle IAM pour y ajouter une policy inline et la définition de notre task pour activer la feature :  
 > cf [commit 'feat: enable ecs exec'](https://github.com/pbenefice/ecs-fargate-with-terraform/commit/6d25844ddbd4827d2bcdb53052fa33c81953cb2f) sur github  
 ```
 resource "aws_iam_role" "ecs_task_role_myapp" {
@@ -199,7 +199,7 @@ resource "aws_ecs_task_definition" "myapp" {
 }
 ```
 
-Nous pouvons dès lors utiliser la cli aws pour se connecter directement dans le container Debian. Il suffit de récupérer via la console le nom du cluster ECS, l'id de la task et le nom du container pour forger une commande similaire à :  
+Nous pouvons dès lors utiliser la CLI AWS pour nous connecter directement dans le container Debian. Il suffit de récupérer via la console le nom du cluster ECS, l'ID de la task et le nom du container pour forger une commande similaire à :  
 
 ```shell
 aws ecs execute-command --cluster ecsWithTf-dev \
@@ -217,8 +217,8 @@ Linux ip-10-0-3-184.eu-west-1.compute.internal 5.10.177-158.645.amzn2.x86_64 #1 
 
 ## Log Driver
 
-Attelons nous à la possibilité pour nos containers d'écrire leur log dans cloudwatch.  
-Il nous faut créer un log group et un second rôle IAM. Le premier servant à donner des droits à notre application : le **task_role**.  Le second, le **execution_role**, permettant de donner des droits à l'agent ECS et au daemon docker afin qu'ils puissent écrire dans cloudwatch :  
+Attelons-nous à la possibilité pour nos containers d'écrire leur log dans Cloudwatch.  
+Il nous faut créer un log group et un second rôle IAM. Le premier servant à donner des droits à notre application : le **task_role**.  Le second, le **execution_role**, permettant de donner des droits à l'agent ECS et au daemon docker afin qu'ils puissent écrire dans Cloudwatch :  
 
 ```
 resource "aws_cloudwatch_log_group" "myapp" {
@@ -301,7 +301,7 @@ resource "aws_ecs_task_definition" "myapp" {
 }
 ```
 
-Une fois que le container a fini de redémarrer nous pouvons ouvrir cloudwatch et constater l'apparition d'un logstream contenant le *Hello World!* généré par notre commande.  
+Une fois que le container a fini de redémarrer nous pouvons ouvrir Cloudwatch et constater l'apparition d'un logstream contenant le *Hello World!* généré par notre commande.  
 ![log-driver-hello-world](./img/log-driver-hello-world.png)  
 
 > Pensez à logguer en json si possible. C'est nativement supporté et formaté par Cloudwatch et ça vous simplifiera la vie plus tard :wink:
@@ -310,10 +310,10 @@ Une fois que le container a fini de redémarrer nous pouvons ouvrir cloudwatch e
 
 Pour cette partie changeons d'image docker pour déployer un serveur Nginx et tester l'exposition d'un container via un load balancer. Il nous faut :
 - créer le load balancer, un listener et un target group
-- modifier la configuration de la task et du service ecs pour ouvrir un port et le mapper avec le target group
-- modifier le Security Group pour autoriser le traffic
+- modifier la configuration de la task et du service ECS pour ouvrir un port et le mapper avec le target group
+- modifier le Security Group pour autoriser le trafic
 
-Rajoutons donc le code terraform suivant :
+Rajoutons donc le code Terraform suivant :
 
 ```shell
 resource "aws_ecs_task_definition" "myapp" {
@@ -407,9 +407,9 @@ resource "aws_lb_listener" "myapp" {
 
 Nous pouvons désormais accéder directement au site exposé par le pod.  
 Si le load balancer est exposé sur internet il suffit de récupérer le DNS Name de ce dernier et d'y accéder en http : `http://<dns_du_load_balancer>`.  
-Dans notre cas le load balancer est interne et n'est accessible que depuis l'intérieur du VPC. Pour exposer le service localement nous pouvons utiliser ssm et le bastion précédemment mis en place.
+Dans notre cas le load balancer est interne et n'est accessible que depuis l'intérieur du VPC. Pour exposer le service localement nous pouvons utiliser SSM et le bastion précédemment mis en place.
 
-A l'aide du nom dns du LB et de l'ID de l'instance EC2 servant de bastion, forgeons la commande suivante :
+A l'aide du nom DNS du LB et de l'ID de l'instance EC2 servant de bastion, forgeons la commande suivante :
 
 ```
 aws ssm start-session --target <BASTION_ID> \
@@ -432,18 +432,18 @@ Le port 80 que nous avons ouvert sur le container Nginx est alors exposé locale
 
 Nous souhaitons maintenant avoir la main sur la config et la page par défaut de Nginx afin de pouvoir personnaliser l'ensemble. Pour cela nous devons contrôler le contenu des dossiers `/etc/nginx/conf.d/` & `/usr/share/nginx/html/` dans le container.  
 Pour ce faire nous allons :
-- mettre à jour le rôle iam utilisé par nos container pour autoriser l'accès au service s3
-- gérer dans le code terraform les fichiers (et leur contenus) que nous souhaitons placer dans lesdits dossiers
-- uploader ces fichiers dans un bucket s3 toujours via terraform
+- mettre à jour le rôle IAM utilisé par nos containers pour autoriser l'accès au service S3
+- gérer dans le code Terraform les fichiers (et leurs contenus) que nous souhaitons placer dans lesdits dossiers
+- uploader ces fichiers dans un bucket S3 toujours via Terraform
 - utiliser un container temporaire qui se lancera avant chaque démarrage du container Nginx seulement le temps de récupérer lesdits fichiers
-- Des volume partagés entre le container nginx et le container temporaire pour que ce dernier puisse y coller les fichiers
-- ces volumes partagés auront pour point de montage dans l'image Nginx les locations par défaut ou doivent se trouver les fichiers de configuration
+- monter des volumes partagés entre le container Nginx et le container temporaire pour que ce dernier puisse y coller les fichiers
+  > Ces volumes partagés auront pour point de montage dans l'image Nginx les locations par défaut où doivent se trouver les fichiers de configuration.
 
-Au final quand le container Nginx démarrera, nos dossiers définis dans terraform auront remplacé ceux existant dans l'image docker (remplacé par nos montage), et nginx s'initialisera avec la configuration que nous maîtrisons.  
+Au final, quand le container Nginx démarrera, nos dossiers définis dans Terraform auront remplacé ceux existant dans l'image docker (écrasés par nos montages), et Nginx s'initialisera avec la configuration que nous maîtrisons.  
 
-> Attention, les montage réseau "suppriment" l'ensemble des fichiers contenu dans le dossier sur lequel ils sont montés. Il faut donc gérer l'ensemble des fichiers qui doivent exister dans le dossier concerné par le point de montage, pas seulement ceux que nous souhaitons modifier.
+> Attention, les montages réseau "suppriment" l'ensemble des fichiers contenus dans le dossier sur lequel ils sont montés. Il faut donc gérer l'ensemble des fichiers qui doivent exister dans le dossier concerné par le point de montage, pas seulement ceux que nous souhaitons modifier.
 
-Créons les fichiers de config localement en ajoutant un dossier artifacts dans notre dossier terraform :  
+Créons les fichiers de config localement en ajoutant un dossier artifacts dans notre dossier Terraform :  
 ```shell
 ./artifacts
 ├── conf.d
@@ -453,7 +453,7 @@ Créons les fichiers de config localement en ajoutant un dossier artifacts dans 
     └── index.html
 ```
 
-Puis modifions de nouveau le code terraform :  
+Puis modifions de nouveau le code Terraform :  
 ```shell
 resource "aws_ecs_task_definition" "myapp" {
   ...
@@ -573,7 +573,7 @@ resource "aws_s3_bucket_object" "myapp_config" {
 }
 ```
 
-L'exemple ici ne montre pas la configuration des logs pour l'init conteneur, mais en copiant collant le même bloc de configuration que pour le conteneur principal on voit la copie s3 dans cloudwatch :  
+L'exemple ici ne montre pas la configuration des logs pour l'init conteneur, mais en copiant-collant le même bloc de configuration que pour le conteneur principal on voit la copie S3 dans Cloudwatch :  
 ![init-container-s3-copy-logs](./img/init-container-s3-copy-logs.png)  
 
 Et en affichant la page par défaut de Nginx, la version modifiée par nos soins s'affiche :  
@@ -581,20 +581,20 @@ Et en affichant la page par défaut de Nginx, la version modifiée par nos soins
 
 ## Redémarrage sur changement de config
 
-Il reste un point à traiter avec le setup via s3 que nous venons de mettre en place. En effet, si nous modifions la configuration de notre appli dans le code terraform : rien ne passe. Or nous voudrions que ces changements soient détectés et provoquent le redémarrage de l'appli pour que l'init-container re-synchronise la config avec les derniers changements et que l'appli redémarre.
+Il reste un point à traiter avec le setup via S3 que nous venons de mettre en place. En effet, si nous modifions la configuration de notre appli dans le code Terraform : rien ne passe. Or nous voudrions que ces changements soient détectés et provoquent le redémarrage de l'appli pour que l'init-container re-synchronise la config avec les derniers changements et que l'appli redémarre.
 
 Deux choses à faire pour cela :
-- modifier l'upload de nos fichiers sur s3 pour suivre les changements sur les fichier locaux, via l'option `etag` de la ressource *bucket_object*
+- modifier l'upload de nos fichiers sur S3 pour suivre les changements sur les fichier locaux, via l'option `etag` de la ressource *bucket_object*
 - forger notre propre hash de l'ensemble des fichiers de config et définir cette valeur comme variable d'environnement dans notre appli. Dès lors, tout changement de cette valeur (et donc de la config) provoquera un redémarrage.
 
-Comme d'habitude, les évolutions du code terraform :  
+Comme d'habitude, les évolutions du code Terraform :  
 ```shell
 locals {
-  # récupération des fichier a synchroniser (comme précédemment)
+  # récupération des fichiers à synchroniser (comme précédemment)
   myapp_config_fileset = fileset("${path.module}/artifacts", "{conf.d,html}/*")
 
-  # hash de tous les fichier, puis hash de la concaténation des hash des fichier :
-  # créé une valeur unique qui change à chaque changement de config
+  # hash de tous les fichiers, puis hash de la concaténation des hash des fichiers :
+  # créer une valeur unique qui change à chaque changement de config
   myapp_config_hash = sha256(join("-", [
     for file in local.myapp_config_fileset :
     filesha256("${path.module}/artifacts/${file}")
@@ -609,7 +609,7 @@ resource "aws_s3_bucket_object" "myapp_config" {
   etag = filemd5("${path.module}/artifacts/${each.value}")
 }
 
-# Ajout d'une variable d'environnement dans le container principal
+# ajout d'une variable d'environnement dans le container principal
 # provoque un changement et donc un redémarrage à chaque modification des fichiers de config
 resource "aws_ecs_task_definition" "myapp" {
   ...
@@ -629,15 +629,15 @@ resource "aws_ecs_task_definition" "myapp" {
 }
 ```
 
-Désormais en changeant l'un des fichiers de configuration, terraform détectera le changement et provoquera le demérrage de l'appli (et donc une re-synchro via s3) :  
+Désormais, en changeant l'un des fichiers de configuration, Terraform détectera le changement et provoquera le demérrage de l'appli (et donc une re-synchro via S3) :  
 ![restart-on-config-change](./img/restart-on-config-change.png)
 
-De mon coté j'ai modifié l'index.html, et aprés un petit temps de patience (quelques minutes) : la page par défaut se met à jour automatiquement.
+De mon coté j'ai modifié l'index.html et après un petit temps de patience (quelques minutes) : la page par défaut se met à jour automatiquement.
 
 ## Le code complet
 
-L'intégralité du code peut être trouvé sur github : [pbenefice/ecs-fargate-with-terraform - /terraform/modules/ecs](https://github.com/pbenefice/ecs-fargate-with-terraform/tree/main/terraform/modules/ecs)  
-Déployé par le biais de la stack terraform : [pbenefice/ecs-fargate-with-terraform - /terraform/stacks/ecs-fargate-with-terraform](https://github.com/pbenefice/ecs-fargate-with-terraform/tree/main/terraform/stacks/ecs-fargate-with-terraform)  
+L'intégralité du code peut être trouvé sur Github : [pbenefice/ecs-fargate-with-terraform - /terraform/modules/ecs](https://github.com/pbenefice/ecs-fargate-with-terraform/tree/main/terraform/modules/ecs)  
+Déployé par le biais de la stack Terraform : [pbenefice/ecs-fargate-with-terraform - /terraform/stacks/ecs-fargate-with-terraform](https://github.com/pbenefice/ecs-fargate-with-terraform/tree/main/terraform/stacks/ecs-fargate-with-terraform)  
 
 Le Makefile dans ce dernier répertoire contient quelques commandes utiles : 
 ```
@@ -655,11 +655,11 @@ tf-destroy-<env>                 terraform destroy for given env (require tf-ini
 
 ## Conclusion
 
-A titre personnel j'ai atteint le terme du POC. J'ai quand même appris deux/trois choses au passage donc je trace et j'espère que ça pourra servir à quelqu'un d'autre. (notamment à moi, d'ici deux mois quand j'aurais tout oublié xD)  
+A titre personnel j'ai atteint le terme du POC. J'ai quand même appris deux/trois choses au passage donc je trace et j'espère que ça pourra servir à quelqu'un d'autre. (Notamment à moi, d'ici deux mois quand j'aurai tout oublié. xD)  
 Encore une fois : n'hésitez pas si vous avez des remarques / questions / suggestions.
 
-Pour aller plus loin a mon sens on pourrait creuser les points suivants :  
-- communication entre service en interne du cluster ?  
+Pour aller plus loin à mon sens on pourrait creuser les points suivants :  
+- communication entre services en interne du cluster ?  
   > [docs.aws.amazon.com - Networking between Amazon ECS services in a VPC](https://docs.aws.amazon.com/AmazonECS/latest/bestpracticesguide/networking-connecting-services.html)  
   > [Hashicorp Demo App](https://github.com/hashicorp/demo-consul-101/tree/master)  
 - test de montée en charge et autoscaling ?  
